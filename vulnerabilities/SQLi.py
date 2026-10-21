@@ -6,6 +6,7 @@ from hashlib import md5
 
 
 # Global Objects
+USER_BY_ID_QUERY = "SELECT userid, username FROM users WHERE userid = ?"
 dbmanager = DBManager()
 
 
@@ -19,10 +20,13 @@ def sqli_low(username, password):
         return "User Exists"
 
     try:
-        stmt = "SELECT userid, username FROM users WHERE username='%s' AND password='%s'" \
-               % (str(username), str(password))
 
-        result = cur.execute(stmt)
+        stmt = (
+            "SELECT userid, username FROM users "
+            "WHERE username = ? AND password = ?"
+        )
+        result = cur.execute(stmt, (username, password))
+
 
     except sqlite3.OperationalError as e:
         return e
@@ -36,15 +40,17 @@ def sqli_medium(userid):
 
     cur = dbmanager.get_db_connection().cursor()
 
-    try:
-        stmt = "SELECT userid, username FROM users WHERE userid='%s'" % (str(userid))
 
-        result = cur.execute(stmt)
+    try:
+        stmt = USER_BY_ID_QUERY
+        result = cur.execute(stmt, (userid,))
+
 
     except sqlite3.OperationalError as e:
         return e
 
     return result.fetchall()
+
 
 
 # SQL Injection - Hard
@@ -60,9 +66,8 @@ def sqli_hard(usernameid):
         usernameid = usernameid.replace("#", "'")
 
     try:
-        stmt = "SELECT userid, username FROM users WHERE userid='%s'" % (str(usernameid))
-
-        result = cur.execute(stmt)
+        stmt = USER_BY_ID_QUERY
+        result = cur.execute(stmt, (usernameid,))
     except sqlite3.OperationalError as e:
         return e
 
@@ -77,12 +82,12 @@ def blind_sqli_low(username, password):
 
     if dbmanager.check_user(username=username):
         return "User Exists"
-
     try:
-        stmt = "SELECT userid, username FROM users WHERE username='%s' AND password='%s'" \
-               % (str(username), str(password))
-
-        result = cur.execute(stmt)
+        stmt = (
+            "SELECT userid, username FROM users "
+            "WHERE username = ? AND password = ?"
+        )
+        result = cur.execute(stmt, (username, password))
 
     except sqlite3.OperationalError:
         return ""
@@ -95,11 +100,9 @@ def blind_sqli_medium(userid):
     global dbmanager
 
     cur = dbmanager.get_db_connection().cursor()
-
     try:
-        stmt = "SELECT userid, username FROM users WHERE userid='%s'" % (str(userid))
-
-        result = cur.execute(stmt)
+        stmt = USER_BY_ID_QUERY
+        result = cur.execute(stmt, (userid,))
 
     except sqlite3.OperationalError:
         return ""
@@ -120,9 +123,9 @@ def blind_sqli_hard(usernameid):
         usernameid = usernameid.replace("#", "'")
 
     try:
-        stmt = "SELECT userid, username FROM users WHERE userid='%s'" % (str(usernameid))
 
-        result = cur.execute(stmt)
+        stmt = USER_BY_ID_QUERY
+        result = cur.execute(stmt, (usernameid,))
     except sqlite3.OperationalError:
         return ""
 
@@ -142,7 +145,10 @@ def secure_login(username, password):
     cur = dbmanager.get_db_connection().cursor()
 
     try:
-        result = cur.execute(f"SELECT username, password FROM users WHERE username=\"{username}\"")
+        result = cur.execute(
+            "SELECT username, password FROM users WHERE username = ?",
+            (username,)
+        )
 
         if type(result) != 'NoneType':
             data = cur.fetchone()
@@ -153,6 +159,6 @@ def secure_login(username, password):
             # Check Passwords
             if password == password_db:
                 return True
-    
-    except Exception as e:
+
+    except Exception:
         return False
